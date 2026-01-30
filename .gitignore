@@ -10,6 +10,7 @@ fonts/
 # Model checkpoints
 checkpoints/
 checkpoints_vae/
+checkpoints_diffusion/
 
 # Latent traversal outputs
 latent_traversals/
