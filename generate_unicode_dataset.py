@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 IMAGE_SIZE = 64
 BACKGROUND_COLOR = "white"
 TEXT_COLOR = "black"
-OUTPUT_DIR = Path("output")
+OUTPUT_DIR = Path("data/unicode_chars")
 FONTS_DIR = Path("fonts")
 
 # Script definitions: (name, unicode_ranges, font_filename, font_url)

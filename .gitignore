@@ -1,24 +1,33 @@
 # Python virtual environment
 venv/
 
-# Generated output (large dataset)
-output/
+# Generated data (large dataset)
+/data/
 
 # Downloaded fonts
 fonts/
 
 # Model checkpoints
 checkpoints/
-checkpoints_vae/
-checkpoints_diffusion/
 
-# Latent traversal outputs
-latent_traversals/
+# Generated samples
+samples/
 
 # Python cache
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
 
 # macOS
 .DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Legacy code (deprecated)
+legacy/
+
+# Jupyter
+.ipynb_checkpoints/

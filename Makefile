@@ -2,7 +2,7 @@
 
 # Default target
 help:
-	@echo "Unicode Character ML Pipeline"
+	@echo "Polylingo: Unicode Character ML Pipeline"
 	@echo ""
 	@echo "Setup:"
 	@echo "  make setup          - Create venv and install dependencies (auto-detect GPU)"
@@ -21,9 +21,7 @@ help:
 	@echo "  make train-all                - Train all models"
 	@echo ""
 	@echo "Sampling & Exploration:"
-	@echo "  make sample-vae               - Generate VAE samples and reconstructions"
 	@echo "  make sample-diffusion         - Generate diffusion samples"
-	@echo "  make explore-latent           - Explore VAE latent space"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make test           - Quick test of all pipelines (2-3 epochs each)"
@@ -35,6 +33,9 @@ VENV := venv
 PIP := $(VENV)/bin/pip
 PY := $(VENV)/bin/python
 
+# Data directory
+DATA_DIR := data/unicode_chars
+
 # Setup targets
 setup: $(VENV)/bin/activate
 	@echo "Setup complete! Activate with: source venv/bin/activate"
@@ -43,6 +44,7 @@ $(VENV)/bin/activate:
 	$(PYTHON) -m venv $(VENV)
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
+	$(PIP) install -e .
 	@echo ""
 	@echo "Detecting GPU..."
 	@$(PY) -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}'); print(f'MPS available: {torch.backends.mps.is_available()}')"
@@ -63,63 +65,47 @@ setup-cpu: $(VENV)/bin/activate
 data: $(VENV)/bin/activate
 	$(PY) generate_unicode_dataset.py
 
-# Training targets
+# Training targets (using new scripts)
 train-classifier: $(VENV)/bin/activate
-	$(PY) train.py --epochs 50 --batch-size 128
+	$(PY) scripts/train_classifier.py --data-dir $(DATA_DIR) --epochs 50 --batch-size 128
 
 train-vae: $(VENV)/bin/activate
-	$(PY) train_vae.py --epochs 100 --batch-size 128 --latent-dim 64
+	$(PY) scripts/train_vae.py --data-dir $(DATA_DIR) --epochs 100 --batch-size 128 --latent-dim 64
 
 train-diffusion: $(VENV)/bin/activate
-	$(PY) train_diffusion.py --epochs 200 --batch-size 64 --sample-interval 20
+	$(PY) scripts/train_diffusion.py --data-dir $(DATA_DIR) --epochs 200 --batch-size 64 --sample-interval 20
 
 train-diffusion-quick: $(VENV)/bin/activate
-	$(PY) train_diffusion.py --epochs 50 --batch-size 64 --sample-interval 10
+	$(PY) scripts/train_diffusion.py --data-dir $(DATA_DIR) --epochs 50 --batch-size 64 --sample-interval 10
 
 train-all: train-classifier train-vae train-diffusion
 
-# Sampling and exploration
-sample-vae: $(VENV)/bin/activate
-	$(PY) explore_latent.py sample --num 64 --output vae_samples.png
-	$(PY) explore_latent.py interpolate \
-		--char1 output/latin/0041.png \
-		--char2 output/latin/005A.png \
-		--output vae_interpolation.png
-	@echo "Samples saved to vae_samples.png and vae_interpolation.png"
-
+# Sampling
 sample-diffusion: $(VENV)/bin/activate
-	$(PY) sample_diffusion.py --num 64 --ddim --output diffusion_samples.png
-	$(PY) sample_diffusion.py --all-classes --ddim --cfg-scale 3.0 --output diffusion_all_classes.png
-	@echo "Samples saved to diffusion_samples.png and diffusion_all_classes.png"
-
-explore-latent: $(VENV)/bin/activate
-	mkdir -p latent_exploration
-	$(PY) explore_latent.py visualize --method tsne --output latent_exploration/tsne.png
-	$(PY) explore_latent.py stats --output-dir latent_exploration
-	$(PY) explore_latent.py traverse --output latent_exploration/traversals
-	@echo "Exploration results saved to latent_exploration/"
+	$(PY) scripts/sample_diffusion.py --num-samples 64 --use-ddim --output-dir samples
+	@echo "Samples saved to samples/"
 
 # Quick test (2-3 epochs each)
 test: $(VENV)/bin/activate
 	@echo "Testing classifier..."
-	$(PY) train.py --epochs 2 --batch-size 64
+	$(PY) scripts/train_classifier.py --data-dir $(DATA_DIR) --epochs 2 --batch-size 64
 	@echo ""
 	@echo "Testing VAE..."
-	$(PY) train_vae.py --epochs 3 --batch-size 64 --latent-dim 32
+	$(PY) scripts/train_vae.py --data-dir $(DATA_DIR) --epochs 3 --batch-size 64 --latent-dim 32
 	@echo ""
 	@echo "Testing diffusion..."
-	$(PY) train_diffusion.py --epochs 2 --batch-size 32 --sample-interval 1
+	$(PY) scripts/train_diffusion.py --data-dir $(DATA_DIR) --epochs 2 --batch-size 32 --sample-interval 1
 	@echo ""
 	@echo "All tests passed!"
 
 # Cleanup
 clean:
-	rm -rf checkpoints/ checkpoints_vae/ checkpoints_diffusion/
-	rm -rf latent_traversals/ latent_exploration/
+	rm -rf checkpoints/
+	rm -rf samples/
 	rm -f *.png
-	rm -rf __pycache__ */__pycache__
+	rm -rf __pycache__ */__pycache__ */*/__pycache__
 	@echo "Cleaned up generated files"
 
 clean-all: clean
-	rm -rf $(VENV) output/ fonts/
-	@echo "Cleaned everything including venv, output, and fonts"
+	rm -rf $(VENV) data/ fonts/
+	@echo "Cleaned everything including venv, data, and fonts"

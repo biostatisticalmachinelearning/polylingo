@@ -3,11 +3,10 @@
 Train a Diffusion Model for Unicode character generation.
 
 Usage:
-    python train_diffusion.py [--epochs N] [--batch-size N] [--timesteps N]
+    python scripts/train_diffusion.py [--epochs N] [--batch-size N] [--timesteps N]
 
 This script trains a conditional diffusion model (DDPM) that can generate
-new Unicode character images. The model uses classifier-free guidance
-for controlled generation by script/language class.
+new Unicode character images using the polylingo package.
 
 Features:
 - Balanced sampling to ensure minority scripts are well-represented
@@ -19,19 +18,18 @@ Features:
 import argparse
 import json
 import random
-import sys
 from pathlib import Path
 
 import numpy as np
 import torch
 
-sys.path.insert(0, str(Path(__file__).parent))
-
-from diffusion.config import DiffusionConfig
-from diffusion.dataset import create_diffusion_data_loaders
-from diffusion.model import SimpleUNet
-from diffusion.diffusion import GaussianDiffusion
-from diffusion.trainer import DiffusionTrainer
+from polylingo import (
+    DiffusionConfig,
+    SimpleUNet,
+    GaussianDiffusion,
+    create_data_loaders,
+    DiffusionTrainer,
+)
 
 
 def set_seed(seed: int):
@@ -51,87 +49,61 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--data-dir",
-        type=Path,
-        default=Path("output"),
+        "--data-dir", type=Path, default=Path("data/unicode_chars"),
         help="Directory containing character images",
     )
     parser.add_argument(
-        "--epochs",
-        type=int,
-        default=200,
+        "--epochs", type=int, default=200,
         help="Number of training epochs",
     )
     parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=64,
+        "--batch-size", type=int, default=64,
         help="Batch size",
     )
     parser.add_argument(
-        "--lr",
-        type=float,
-        default=2e-4,
+        "--lr", type=float, default=2e-4,
         help="Learning rate",
     )
     parser.add_argument(
-        "--timesteps",
-        type=int,
-        default=1000,
+        "--timesteps", type=int, default=1000,
         help="Number of diffusion timesteps",
     )
     parser.add_argument(
-        "--base-channels",
-        type=int,
-        default=64,
+        "--base-channels", type=int, default=64,
         help="Base channel count for U-Net",
     )
     parser.add_argument(
-        "--beta-schedule",
-        type=str,
-        default="cosine",
+        "--beta-schedule", type=str, default="cosine",
         choices=["linear", "cosine"],
         help="Noise schedule type",
     )
     parser.add_argument(
-        "--cfg-scale",
-        type=float,
-        default=3.0,
+        "--cfg-scale", type=float, default=3.0,
         help="Classifier-free guidance scale",
     )
     parser.add_argument(
-        "--no-cfg",
-        action="store_true",
+        "--no-cfg", action="store_true",
         help="Disable classifier-free guidance",
     )
     parser.add_argument(
-        "--no-balanced-sampling",
-        action="store_true",
+        "--no-balanced-sampling", action="store_true",
         help="Disable balanced class sampling",
     )
     parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
+        "--seed", type=int, default=42,
         help="Random seed",
     )
     parser.add_argument(
-        "--workers",
-        type=int,
-        default=4,
+        "--workers", type=int, default=4,
         help="Number of data loading workers",
     )
     parser.add_argument(
-        "--device",
-        type=str,
-        default="auto",
+        "--device", type=str, default="auto",
         choices=["auto", "cuda", "mps", "cpu"],
         help="Device to use",
     )
     parser.add_argument(
-        "--sample-interval",
-        type=int,
-        default=10,
+        "--sample-interval", type=int, default=10,
         help="Generate samples every N epochs",
     )
 
@@ -171,7 +143,6 @@ def main():
     print(f"  Learning rate: {config.learning_rate}")
     print(f"  Timesteps: {config.num_timesteps}")
     print(f"  Beta schedule: {config.beta_schedule}")
-    print(f"  Base channels: {config.base_channels}")
     print(f"  Classifier-free guidance: {config.use_cfg}")
     print(f"  CFG scale: {config.cfg_scale}")
     print(f"  Balanced sampling: {config.use_balanced_sampling}")
@@ -181,7 +152,19 @@ def main():
     print("Loading Data")
     print("=" * 60)
 
-    train_loader, test_loader, idx_to_class, class_to_idx, class_weights = create_diffusion_data_loaders(config)
+    train_loader, test_loader, idx_to_class, class_to_idx, class_weights = create_data_loaders(
+        data_dir=config.data_dir,
+        mode="diffusion",
+        batch_size=config.batch_size,
+        test_split=config.test_split,
+        use_balanced_sampling=config.use_balanced_sampling,
+        class_weight_power=config.class_weight_power,
+        num_workers=config.num_workers,
+        pin_memory=config.pin_memory,
+        random_seed=config.random_seed,
+    )
+
+    config.num_classes = len(idx_to_class)
 
     # Create model
     print("\n" + "=" * 60)
@@ -196,7 +179,6 @@ def main():
         num_classes=config.num_classes if config.conditional else None,
     )
 
-    # Count parameters
     total_params = sum(p.numel() for p in model.parameters())
     print(f"U-Net parameters: {total_params:,}")
 

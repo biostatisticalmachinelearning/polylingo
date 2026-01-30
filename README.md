@@ -1,6 +1,6 @@
-# Unicode Character ML Pipeline
+# Polylingo: Unicode Character ML Pipeline
 
-A machine learning pipeline for generating and analyzing Unicode characters across 52 world writing systems. Includes a dataset generator, classifier, variational autoencoder (VAE), and diffusion model.
+A machine learning toolkit for analyzing and generating Unicode characters across 52 world writing systems. Includes a dataset generator, classifier, variational autoencoder (VAE), and diffusion model.
 
 ## Features
 
@@ -13,13 +13,13 @@ A machine learning pipeline for generating and analyzing Unicode characters acro
 
 ```bash
 # Clone the repo
-git clone <repo-url>
-cd autoencoding-scripts
+git clone https://github.com/biostatisticalmachinelearning/polylingo
+cd polylingo
 
 # Setup (auto-detects GPU)
 make setup
 
-# Generate the dataset (~17k images, takes a few minutes)
+# Generate the dataset (~17k images)
 make data
 
 # Run a quick test of all models (2-3 epochs each)
@@ -62,6 +62,7 @@ make setup-cpu
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+pip install -e .
 
 # For NVIDIA GPU, install CUDA version:
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
@@ -80,7 +81,7 @@ python generate_unicode_dataset.py
 This downloads Noto fonts and generates 64x64 PNG images:
 
 ```
-output/
+data/unicode_chars/
 ├── latin/          # 526 images (A-Z, a-z, accented chars, etc.)
 ├── greek/          # 368 images
 ├── cyrillic/       # 297 images
@@ -102,12 +103,7 @@ Train a classifier to identify which script a character belongs to:
 ```bash
 make train-classifier
 # or
-python train.py --epochs 50 --batch-size 128
-```
-
-Test predictions:
-```bash
-python predict.py output/latin/0041.png output/hiragana/3042.png
+python scripts/train_classifier.py --epochs 50 --batch-size 128
 ```
 
 ### 2. Variational Autoencoder (VAE)
@@ -117,7 +113,7 @@ Train a VAE to learn a latent space representation:
 ```bash
 make train-vae
 # or
-python train_vae.py --epochs 100 --latent-dim 64 --beta 1.0
+python scripts/train_vae.py --epochs 100 --latent-dim 64 --beta 1.0
 ```
 
 Options:
@@ -132,7 +128,7 @@ Train a diffusion model to generate new characters:
 ```bash
 make train-diffusion
 # or
-python train_diffusion.py --epochs 200 --batch-size 64
+python scripts/train_diffusion.py --epochs 200 --batch-size 64
 ```
 
 Options:
@@ -140,52 +136,67 @@ Options:
 - `--cfg-scale`: Classifier-free guidance scale (default: 3.0)
 - `--beta-schedule`: Noise schedule, "cosine" or "linear"
 
-**Note**: Diffusion models need more training time. For experimentation, start with:
+**Note**: Diffusion models need more training time. For experimentation:
 ```bash
 make train-diffusion-quick  # 50 epochs
 ```
 
-## Sampling & Exploration
-
-### VAE Exploration
-
-```bash
-# Generate random samples from latent space
-python explore_latent.py sample --num 64 --output samples.png
-
-# Interpolate between two characters
-python explore_latent.py interpolate \
-    --char1 output/latin/0041.png \
-    --char2 output/latin/005A.png \
-    --steps 11 \
-    --output A_to_Z.png
-
-# Find visually similar characters
-python explore_latent.py neighbors --char output/latin/0041.png --k 10
-
-# Visualize latent space with t-SNE
-python explore_latent.py visualize --method tsne --output tsne.png
-
-# Traverse individual latent dimensions
-python explore_latent.py traverse --dim 0 --output dim0.png
-python explore_latent.py traverse --output traversals/  # All dimensions
-```
+## Sampling
 
 ### Diffusion Sampling
 
 ```bash
 # Generate random samples (DDIM for speed)
-python sample_diffusion.py --num 64 --ddim --output samples.png
+python scripts/sample_diffusion.py --num-samples 64 --use-ddim
 
 # Generate specific scripts
-python sample_diffusion.py --class latin --num 16 --ddim
-python sample_diffusion.py --class hiragana --num 16 --cfg-scale 5.0
+python scripts/sample_diffusion.py --class-label 0 --num-samples 16 --use-ddim
 
-# Generate one sample per script
-python sample_diffusion.py --all-classes --ddim --output all_scripts.png
+# With higher guidance
+python scripts/sample_diffusion.py --cfg-scale 5.0 --use-ddim
+```
 
-# List available scripts
-python sample_diffusion.py --list-classes
+## Project Structure
+
+```
+polylingo/
+├── polylingo/                   # Main package
+│   ├── __init__.py             # Package exports
+│   ├── data/                   # Data loading and transforms
+│   │   ├── dataset.py          # UnicodeDataset class
+│   │   ├── transforms.py       # Image transforms
+│   │   ├── balancing.py        # Class weight computation
+│   │   └── loaders.py          # Data loader factory
+│   ├── models/                 # Neural network architectures
+│   │   ├── classifier.py       # ResNet classifier
+│   │   ├── vae.py              # Variational Autoencoder
+│   │   ├── unet.py             # U-Net for diffusion
+│   │   └── diffusion.py        # Gaussian diffusion process
+│   ├── configs/                # Configuration dataclasses
+│   │   ├── base.py             # Base configuration
+│   │   ├── classifier.py       # Classifier config
+│   │   ├── vae.py              # VAE config
+│   │   └── diffusion.py        # Diffusion config
+│   ├── trainers/               # Training loops
+│   │   ├── base.py             # Base trainer
+│   │   ├── classifier.py       # Classifier trainer
+│   │   ├── vae.py              # VAE trainer
+│   │   └── diffusion.py        # Diffusion trainer
+│   └── utils/                  # Utilities
+│       ├── device.py           # Device detection
+│       ├── ema.py              # Exponential moving average
+│       ├── early_stopping.py   # Early stopping
+│       └── schedulers.py       # LR schedulers
+├── scripts/                    # Training/sampling scripts
+│   ├── train_classifier.py
+│   ├── train_vae.py
+│   ├── train_diffusion.py
+│   └── sample_diffusion.py
+├── generate_unicode_dataset.py # Dataset generation
+├── requirements.txt
+├── setup.py
+├── Makefile
+└── README.md
 ```
 
 ## Class Balancing
@@ -194,47 +205,7 @@ The dataset is highly imbalanced:
 - **Largest**: Han CJK (8,000 characters)
 - **Smallest**: Tagalog (17 characters)
 
-All models use **weighted random sampling** to ensure minority scripts are well-represented:
-
-```
-Class distribution and sampling weights:
-  han_cjk                  :  6400 samples, weight=0.275
-  hangul                   :  1880 samples, weight=0.507
-  ...
-  tagalog                  :    14 samples, weight=5.872
-```
-
-## Project Structure
-
-```
-autoencoding-scripts/
-├── generate_unicode_dataset.py  # Dataset generation
-├── train.py                     # Classifier training
-├── predict.py                   # Classifier inference
-├── train_vae.py                 # VAE training
-├── explore_latent.py            # VAE latent space tools
-├── train_diffusion.py           # Diffusion training
-├── sample_diffusion.py          # Diffusion sampling
-├── ml/                          # Classifier module
-│   ├── config.py
-│   ├── dataset.py
-│   ├── model.py
-│   └── trainer.py
-├── vae/                         # VAE module
-│   ├── config.py
-│   ├── dataset.py
-│   ├── model.py
-│   └── trainer.py
-├── diffusion/                   # Diffusion module
-│   ├── config.py
-│   ├── dataset.py
-│   ├── diffusion.py
-│   ├── model.py
-│   └── trainer.py
-├── requirements.txt
-├── Makefile
-└── README.md
-```
+All models use **weighted random sampling** to ensure minority scripts are well-represented.
 
 ## GPU Memory Requirements
 
@@ -247,7 +218,7 @@ autoencoding-scripts/
 
 Reduce batch size if you run out of memory:
 ```bash
-python train_diffusion.py --batch-size 32
+python scripts/train_diffusion.py --batch-size 32
 ```
 
 ## Tips for Better Results

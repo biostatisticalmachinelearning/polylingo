@@ -4,26 +4,22 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from .base import BaseConfig
+
 
 @dataclass
-class DiffusionConfig:
+class DiffusionConfig(BaseConfig):
     """Diffusion model training configuration."""
 
     # Paths
-    data_dir: Path = Path("output")
-    checkpoint_dir: Path = Path("checkpoints_diffusion")
+    checkpoint_dir: Path = Path("checkpoints/diffusion")
 
     # Data
-    image_size: int = 64
-    image_channels: int = 1  # Grayscale
     test_split: float = 0.1
-    random_seed: int = 42
 
     # Model architecture (U-Net)
     base_channels: int = 64
     channel_mults: tuple = (1, 2, 4, 8)
-    num_res_blocks: int = 2
-    attention_resolutions: tuple = (16, 8)  # Apply attention at these resolutions
     dropout: float = 0.1
 
     # Conditional generation
@@ -54,28 +50,10 @@ class DiffusionConfig:
     cfg_scale: float = 3.0  # Guidance scale during sampling
 
     # Learning rate scheduler
-    lr_scheduler: str = "cosine"
     warmup_steps: int = 1000
-
-    # Hardware
-    num_workers: int = 4
-    pin_memory: bool = True
-    device: str = "auto"
 
     # Logging and sampling
     log_interval: int = 100
     sample_interval: int = 10  # Generate samples every N epochs
     num_samples: int = 64
     save_interval: int = 20  # Save checkpoint every N epochs
-
-    def __post_init__(self):
-        import torch
-        self.data_dir = Path(self.data_dir)
-        self.checkpoint_dir = Path(self.checkpoint_dir)
-        self.checkpoint_dir.mkdir(exist_ok=True)
-
-        # Disable pin_memory on MPS
-        if self.device == "auto" and torch.backends.mps.is_available():
-            self.pin_memory = False
-        elif self.device == "mps":
-            self.pin_memory = False

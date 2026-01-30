@@ -3,28 +3,27 @@
 Train a Variational Autoencoder on Unicode character images.
 
 Usage:
-    python train_vae.py [--latent-dim N] [--beta FLOAT] [--epochs N]
+    python scripts/train_vae.py [--latent-dim N] [--beta FLOAT] [--epochs N]
 
 This script trains a convolutional VAE to learn a latent representation
-of Unicode characters. The learned latent space can be explored to
-understand how different scripts and characters are encoded.
+of Unicode characters using the polylingo package.
 """
 
 import argparse
 import json
 import random
-import sys
 from pathlib import Path
 
 import numpy as np
 import torch
 
-sys.path.insert(0, str(Path(__file__).parent))
-
-from vae.config import VAEConfig
-from vae.dataset import create_vae_data_loaders
-from vae.model import create_vae
-from vae.trainer import VAETrainer
+from polylingo import (
+    VAEConfig,
+    ConvVAE,
+    ConditionalConvVAE,
+    create_data_loaders,
+    VAETrainer,
+)
 
 
 def set_seed(seed: int):
@@ -46,69 +45,47 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--data-dir",
-        type=Path,
-        default=Path("output"),
+        "--data-dir", type=Path, default=Path("data/unicode_chars"),
         help="Directory containing the character images",
     )
     parser.add_argument(
-        "--latent-dim",
-        type=int,
-        default=64,
+        "--latent-dim", type=int, default=64,
         help="Dimension of the latent space",
     )
     parser.add_argument(
-        "--beta",
-        type=float,
-        default=1.0,
+        "--beta", type=float, default=1.0,
         help="Beta parameter for KL divergence weight (beta-VAE)",
     )
     parser.add_argument(
-        "--epochs",
-        type=int,
-        default=100,
+        "--epochs", type=int, default=100,
         help="Number of training epochs",
     )
     parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=128,
+        "--batch-size", type=int, default=128,
         help="Batch size for training",
     )
     parser.add_argument(
-        "--lr",
-        type=float,
-        default=1e-3,
+        "--lr", type=float, default=1e-3,
         help="Learning rate",
     )
     parser.add_argument(
-        "--hidden-dims",
-        type=int,
-        nargs="+",
-        default=[32, 64, 128, 256],
+        "--hidden-dims", type=int, nargs="+", default=[32, 64, 128, 256],
         help="Hidden dimensions for encoder/decoder",
     )
     parser.add_argument(
-        "--conditional",
-        action="store_true",
+        "--conditional", action="store_true",
         help="Train a conditional VAE (condition on script label)",
     )
     parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
+        "--seed", type=int, default=42,
         help="Random seed",
     )
     parser.add_argument(
-        "--workers",
-        type=int,
-        default=4,
+        "--workers", type=int, default=4,
         help="Number of data loading workers",
     )
     parser.add_argument(
-        "--device",
-        type=str,
-        default="auto",
+        "--device", type=str, default="auto",
         choices=["auto", "cuda", "mps", "cpu"],
         help="Device to use",
     )
@@ -119,8 +96,6 @@ def parse_args() -> argparse.Namespace:
 def main():
     """Main training function."""
     args = parse_args()
-
-    # Set seed
     set_seed(args.seed)
 
     # Create configuration
@@ -149,23 +124,48 @@ def main():
     print(f"  Conditional: {config.conditional}")
     print(f"  Epochs: {config.num_epochs}")
     print(f"  Batch size: {config.batch_size}")
-    print(f"  Learning rate: {config.learning_rate}")
 
     # Create data loaders
     print("\n" + "=" * 60)
     print("Loading Data")
     print("=" * 60)
 
-    train_loader, test_loader, idx_to_class, class_to_idx = create_vae_data_loaders(config)
+    mode = "vae"  # Uses reconstruction mode
+    train_loader, test_loader, idx_to_class, class_to_idx, _ = create_data_loaders(
+        data_dir=config.data_dir,
+        mode=mode,
+        batch_size=config.batch_size,
+        test_split=config.test_split,
+        use_balanced_sampling=False,
+        num_workers=config.num_workers,
+        pin_memory=config.pin_memory,
+        random_seed=config.random_seed,
+    )
+
+    if config.conditional:
+        config.num_classes = len(idx_to_class)
 
     # Create model
     print("\n" + "=" * 60)
     print("Creating Model")
     print("=" * 60)
 
-    model = create_vae(config)
+    if config.conditional:
+        model = ConditionalConvVAE(
+            latent_dim=config.latent_dim,
+            image_channels=config.image_channels,
+            hidden_dims=config.hidden_dims,
+            image_size=config.image_size,
+            num_classes=config.num_classes,
+        )
+    else:
+        model = ConvVAE(
+            latent_dim=config.latent_dim,
+            image_channels=config.image_channels,
+            hidden_dims=config.hidden_dims,
+            image_size=config.image_size,
+        )
 
-    # Count parameters
     total_params = sum(p.numel() for p in model.parameters())
     print(f"Total parameters: {total_params:,}")
     print(f"Latent space dimension: {config.latent_dim}")
@@ -211,7 +211,7 @@ def main():
     print("=" * 60)
     print(f"Best checkpoint: {config.checkpoint_dir / 'best_vae.pt'}")
     print(f"Samples directory: {trainer.samples_dir}")
-    print(f"Best validation loss: {trainer.best_val_loss:.4f}")
+    print(f"Best validation loss: {trainer.best_loss:.4f}")
 
 
 if __name__ == "__main__":
