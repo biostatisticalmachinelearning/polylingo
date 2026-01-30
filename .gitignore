@@ -9,6 +9,10 @@ fonts/
 
 # Model checkpoints
 checkpoints/
+checkpoints_vae/
+
+# Latent traversal outputs
+latent_traversals/
 
 # Python cache
 __pycache__/
