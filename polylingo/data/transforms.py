@@ -8,6 +8,12 @@ IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
+class Identity:
+    """Identity transform that returns input unchanged. Picklable alternative to Lambda."""
+    def __call__(self, x):
+        return x
+
+
 def get_normalize_transform(mode: str = "classification"):
     """Get normalization transform based on mode.
 
@@ -22,7 +28,7 @@ def get_normalize_transform(mode: str = "classification"):
         return transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
     elif mode == "vae":
         # No normalization - keep in [0, 1] for BCE loss
-        return transforms.Lambda(lambda x: x)
+        return Identity()
     elif mode == "diffusion":
         # Scale to [-1, 1] for diffusion
         return transforms.Normalize(mean=[0.5], std=[0.5])
