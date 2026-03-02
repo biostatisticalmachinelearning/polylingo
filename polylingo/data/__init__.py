@@ -1,6 +1,11 @@
 """Data loading and processing utilities."""
 
-from .dataset import UnicodeDataset, load_dataset_info
+from .dataset import (
+    UnicodeDataset,
+    load_dataset_info,
+    DEFAULT_INCLUDE_SCRIPTS,
+    DEFAULT_EXCLUDE_SCRIPTS,
+)
 from .transforms import get_transforms, get_normalize_transform
 from .balancing import compute_class_weights, create_balanced_sampler
 from .loaders import create_data_loaders
@@ -8,6 +13,8 @@ from .loaders import create_data_loaders
 __all__ = [
     "UnicodeDataset",
     "load_dataset_info",
+    "DEFAULT_INCLUDE_SCRIPTS",
+    "DEFAULT_EXCLUDE_SCRIPTS",
     "get_transforms",
     "get_normalize_transform",
     "compute_class_weights",

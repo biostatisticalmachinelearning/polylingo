@@ -1,7 +1,7 @@
 """Data loader creation utilities."""
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 import torch
 from sklearn.model_selection import train_test_split
@@ -28,6 +28,8 @@ def create_data_loaders(
     random_seed: int = 42,
     image_size: int = 64,
     verbose: bool = True,
+    include_scripts: Optional[Sequence[str]] = None,
+    exclude_scripts: Optional[Sequence[str]] = None,
 ) -> tuple[DataLoader, DataLoader, dict[int, str], dict[str, int], Optional[torch.Tensor]]:
     """Create train and test data loaders.
 
@@ -45,6 +47,8 @@ def create_data_loaders(
         random_seed: Random seed for reproducibility.
         image_size: Target image size.
         verbose: Whether to print statistics.
+        include_scripts: Optional script allowlist. Defaults to CJK scripts.
+        exclude_scripts: Optional script denylist. Defaults to excluding symbols.
 
     Returns:
         Tuple of (train_loader, test_loader, idx_to_class, class_to_idx, class_weights).
@@ -54,7 +58,11 @@ def create_data_loaders(
         pin_memory = False
 
     # Load dataset info
-    paths, labels, idx_to_class, class_to_idx = load_dataset_info(data_dir)
+    paths, labels, idx_to_class, class_to_idx = load_dataset_info(
+        data_dir,
+        include_scripts=include_scripts,
+        exclude_scripts=exclude_scripts,
+    )
     num_classes = len(idx_to_class)
 
     if verbose:

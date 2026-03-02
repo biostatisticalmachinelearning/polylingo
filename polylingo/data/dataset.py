@@ -2,11 +2,20 @@
 
 import json
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional, Callable, Sequence
 
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
+
+# Default dataset filters used across training/eval scripts.
+DEFAULT_INCLUDE_SCRIPTS: tuple[str, ...] = (
+    "han_cjk",
+    "hiragana",
+    "katakana",
+    "hangul",
+)
+DEFAULT_EXCLUDE_SCRIPTS: tuple[str, ...] = ("symbols",)
 
 
 class UnicodeDataset(Dataset):
@@ -67,22 +76,56 @@ class UnicodeDataset(Dataset):
             return image, label
 
 
-def load_dataset_info(data_dir: Path) -> tuple[list[Path], list[int], dict[int, str], dict[str, int]]:
+def _normalize_script_filter(scripts: Optional[Sequence[str]]) -> set[str]:
+    """Normalize script names from user/config inputs."""
+    if scripts is None:
+        return set()
+    return {name.strip() for name in scripts if name and name.strip()}
+
+
+def load_dataset_info(
+    data_dir: Path,
+    include_scripts: Optional[Sequence[str]] = None,
+    exclude_scripts: Optional[Sequence[str]] = None,
+) -> tuple[list[Path], list[int], dict[int, str], dict[str, int]]:
     """Load all image paths and labels from a dataset directory.
 
     Args:
         data_dir: Path to directory containing script subdirectories.
+        include_scripts: Optional script allowlist. Defaults to CJK scripts.
+        exclude_scripts: Optional script denylist. Defaults to excluding symbols.
 
     Returns:
         Tuple of (image_paths, labels, idx_to_class, class_to_idx).
     """
     data_dir = Path(data_dir)
 
+    if include_scripts is None:
+        include_scripts = DEFAULT_INCLUDE_SCRIPTS
+    if exclude_scripts is None:
+        exclude_scripts = DEFAULT_EXCLUDE_SCRIPTS
+
+    include_set = _normalize_script_filter(include_scripts)
+    exclude_set = _normalize_script_filter(exclude_scripts)
+
     # Get all script directories (sorted for reproducibility)
-    script_dirs = sorted([
+    all_script_dirs = sorted([
         d for d in data_dir.iterdir()
         if d.is_dir() and not d.name.startswith('.')
     ])
+    script_dirs = [
+        d for d in all_script_dirs
+        if (not include_set or d.name in include_set) and d.name not in exclude_set
+    ]
+
+    if not script_dirs:
+        available_scripts = ", ".join(d.name for d in all_script_dirs) or "<none>"
+        include_label = ", ".join(sorted(include_set)) if include_set else "<all>"
+        exclude_label = ", ".join(sorted(exclude_set)) if exclude_set else "<none>"
+        raise ValueError(
+            "No scripts found after applying filters. "
+            f"include={include_label}, exclude={exclude_label}, available={available_scripts}"
+        )
 
     # Build class mappings
     class_names = [d.name for d in script_dirs]

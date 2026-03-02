@@ -1,10 +1,10 @@
 # Polylingo: Unicode Character ML Pipeline
 
-A machine learning toolkit for analyzing and generating Unicode characters across 52 world writing systems. Includes a dataset generator, classifier, variational autoencoder (VAE), and diffusion model.
+A machine learning toolkit for analyzing and generating Unicode characters across world writing systems. Includes a dataset generator, classifier, variational autoencoder (VAE), and diffusion model.
 
 ## Features
 
-- **Dataset Generator**: Creates 64x64 PNG images for ~17,000 Unicode characters using Google's Noto fonts
+- **Dataset Generator**: Creates 64x64 PNG images for Unicode characters using Google's Noto fonts (defaults to CJK scripts)
 - **ResNet Classifier**: Classifies characters into their script/language family
 - **VAE**: Learns a latent space representation of characters for exploration and interpolation
 - **Diffusion Model**: Generates new, convincing character shapes with class-conditional control
@@ -19,7 +19,7 @@ cd polylingo
 # Setup (auto-detects GPU)
 make setup
 
-# Generate the dataset (~17k images)
+# Generate the dataset (defaults to CJK scripts)
 make data
 
 # Run a quick test of all models (2-3 epochs each)
@@ -70,29 +70,33 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 ## Dataset Generation
 
-Generate character images for 52 scripts:
+Generate character images (defaults to CJK scripts: `han_cjk`, `hiragana`, `katakana`, `hangul`):
 
 ```bash
 make data
 # or
 python generate_unicode_dataset.py
+
+# Generate all scripts
+python generate_unicode_dataset.py --all-scripts
+
+# Include symbols explicitly
+python generate_unicode_dataset.py --all-scripts --include-symbols
 ```
 
 This downloads Noto fonts and generates 64x64 PNG images:
 
 ```
 data/unicode_chars/
-├── latin/          # 526 images (A-Z, a-z, accented chars, etc.)
-├── greek/          # 368 images
-├── cyrillic/       # 297 images
-├── arabic/         # 243 images
 ├── han_cjk/        # 8,000 images (Chinese characters)
 ├── hiragana/       # 91 images
+├── katakana/       # 96 images
 ├── hangul/         # 2,350 images (Korean syllables)
-├── devanagari/     # 94 images (Hindi, Sanskrit)
-├── ... (44 more scripts)
+├── ... (plus any optional scripts if enabled)
 └── metadata.json   # Character names and codepoints
 ```
+
+Training/eval data loading also defaults to that same CJK subset and excludes `symbols`.
 
 ## Training
 
@@ -201,7 +205,7 @@ polylingo/
 
 ## Class Balancing
 
-The dataset is highly imbalanced:
+The dataset is highly imbalanced (especially when using `--all-scripts`):
 - **Largest**: Han CJK (8,000 characters)
 - **Smallest**: Tagalog (17 characters)
 

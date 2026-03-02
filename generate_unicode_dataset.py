@@ -4,12 +4,15 @@ Unicode Character Dataset Generator
 
 Generates 64x64 PNG images for Unicode characters across world writing systems
 using Noto fonts, organized by script with JSON metadata.
+
+By default this generates CJK scripts and excludes symbols.
 """
 
+import argparse
 import json
-import os
 import unicodedata
 from pathlib import Path
+from typing import Optional, Sequence
 
 import requests
 from PIL import Image, ImageDraw, ImageFont
@@ -20,6 +23,8 @@ BACKGROUND_COLOR = "white"
 TEXT_COLOR = "black"
 OUTPUT_DIR = Path("data/unicode_chars")
 FONTS_DIR = Path("fonts")
+DEFAULT_INCLUDE_SCRIPTS = ("han_cjk", "hiragana", "katakana", "hangul")
+DEFAULT_EXCLUDE_SCRIPTS = ("symbols",)
 
 # Script definitions: (name, unicode_ranges, font_filename, font_url)
 # Font URLs point to Google's Noto fonts GitHub releases
@@ -589,10 +594,86 @@ def generate_script(script_info: dict, metadata: dict) -> int:
     return count
 
 
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Generate a Unicode character image dataset",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    script_group = parser.add_mutually_exclusive_group()
+    script_group.add_argument(
+        "--all-scripts",
+        action="store_true",
+        help="Generate all scripts instead of the default CJK subset",
+    )
+    script_group.add_argument(
+        "--scripts",
+        nargs="+",
+        default=None,
+        help="Specific scripts to include (space-separated names)",
+    )
+    parser.add_argument(
+        "--exclude-scripts",
+        nargs="+",
+        default=None,
+        help="Scripts to exclude (default: symbols unless --include-symbols is set)",
+    )
+    parser.add_argument(
+        "--include-symbols",
+        action="store_true",
+        help="Include symbols in the generated dataset",
+    )
+    return parser.parse_args()
+
+
+def _normalize_script_filter(names: Optional[Sequence[str]]) -> set[str]:
+    """Normalize script names from command-line filters."""
+    if names is None:
+        return set()
+    return {name.strip() for name in names if name and name.strip()}
+
+
+def select_scripts(args: argparse.Namespace) -> list[dict]:
+    """Select script definitions based on include/exclude filters."""
+    if args.all_scripts:
+        include = set()
+    elif args.scripts is not None:
+        include = _normalize_script_filter(args.scripts)
+    else:
+        include = set(DEFAULT_INCLUDE_SCRIPTS)
+
+    if args.exclude_scripts is None:
+        exclude = set(DEFAULT_EXCLUDE_SCRIPTS)
+        if args.include_symbols:
+            exclude.discard("symbols")
+    else:
+        exclude = _normalize_script_filter(args.exclude_scripts)
+
+    available = {script["name"] for script in SCRIPTS}
+    unknown_include = sorted(include - available)
+    unknown_exclude = sorted(exclude - available)
+    if unknown_include:
+        print(f"Warning: Unknown include scripts ignored: {', '.join(unknown_include)}")
+    if unknown_exclude:
+        print(f"Warning: Unknown exclude scripts ignored: {', '.join(unknown_exclude)}")
+
+    selected = [
+        script for script in SCRIPTS
+        if (not include or script["name"] in include) and script["name"] not in exclude
+    ]
+    if not selected:
+        raise ValueError("No scripts selected after applying include/exclude filters.")
+    return selected
+
+
 def main():
     """Main entry point."""
+    args = parse_args()
+    selected_scripts = select_scripts(args)
+
     print("Unicode Character Dataset Generator")
     print("=" * 40)
+    print(f"Selected scripts: {', '.join(script['name'] for script in selected_scripts)}")
 
     # Create directories
     OUTPUT_DIR.mkdir(exist_ok=True)
@@ -600,7 +681,7 @@ def main():
 
     # Download all fonts first
     print("\nPhase 1: Downloading fonts...")
-    fonts_to_download = {s["font"]: s for s in SCRIPTS if s.get("url")}
+    fonts_to_download = {s["font"]: s for s in selected_scripts if s.get("url")}
     for font_name, script_info in fonts_to_download.items():
         print(f"\nFont: {font_name}")
         download_font(script_info)
@@ -612,7 +693,7 @@ def main():
     metadata = {}
     total_count = 0
 
-    for script_info in SCRIPTS:
+    for script_info in selected_scripts:
         script_name = script_info["name"]
         font_path = FONTS_DIR / script_info["font"]
 

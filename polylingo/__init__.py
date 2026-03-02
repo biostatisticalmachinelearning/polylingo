@@ -12,6 +12,8 @@ from .data import (
     UnicodeDataset,
     create_data_loaders,
     load_dataset_info,
+    DEFAULT_INCLUDE_SCRIPTS,
+    DEFAULT_EXCLUDE_SCRIPTS,
 )
 
 from .models import (
@@ -47,6 +49,8 @@ __all__ = [
     "UnicodeDataset",
     "create_data_loaders",
     "load_dataset_info",
+    "DEFAULT_INCLUDE_SCRIPTS",
+    "DEFAULT_EXCLUDE_SCRIPTS",
     # Models
     "create_classifier",
     "ConvVAE",

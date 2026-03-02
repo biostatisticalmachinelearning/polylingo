@@ -11,7 +11,7 @@ help:
 	@echo "  make setup-cpu      - Setup for CPU only"
 	@echo ""
 	@echo "Data:"
-	@echo "  make data           - Download fonts and generate character images"
+	@echo "  make data           - Download fonts and generate CJK character images"
 	@echo ""
 	@echo "Training:"
 	@echo "  make train-classifier         - Train ResNet classifier (50 epochs)"
